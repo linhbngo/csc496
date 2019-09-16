@@ -27,6 +27,7 @@ node.disk_image = "urn:publicid:IDN+emulab.net+image+emulab-ops:CENTOS7-64-STD"
 node.routable_control_ip = "true"
 
 node.addService(pg.Execute(shell="sh", command="sudo chmod 755 /local/repository/install_mpi.sh"))
+node.addService(pg.Execute(shell="sh", command="sudo /local/repository/install_mpi.sh"))
   
 # Print the RSpec to the enclosing page.
 pc.printRequestRSpec(request)
