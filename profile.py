@@ -19,10 +19,8 @@ tour = IG.Tour()
 tour.Description(IG.Tour.TEXT,tourDescription)
 request.addTour(tour)
 
-node = request.XenVM("compute-node")
-node.cores = 4
-node.ram = 4096
-    
+node = request.rawPC("compute-node")
+
 node.disk_image = "urn:publicid:IDN+emulab.net+image+emulab-ops:CENTOS7-64-STD"
 node.routable_control_ip = "true"
 
