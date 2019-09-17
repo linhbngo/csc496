@@ -19,7 +19,7 @@ tour = IG.Tour()
 tour.Description(IG.Tour.TEXT,tourDescription)
 request.addTour(tour)
 
-node = request.rawPC("compute-node")
+node = request.RawPC("compute-node")
 
 node.disk_image = "urn:publicid:IDN+emulab.net+image+emulab-ops:CENTOS7-64-STD"
 node.routable_control_ip = "true"
