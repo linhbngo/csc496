@@ -1,4 +1,4 @@
-dn: uid=student,ou=People,dc=csc,dc=wcupa,dc=edu
+dn: uid=merino,ou=People,dc=csc,dc=wcupa,dc=edu
 objectClass: inetOrgPerson
 objectClass: posixAccount
 objectClass: shadowAccount
@@ -14,7 +14,7 @@ gecos: Golden Merino
 loginShell: /bin/dash
 homeDirectory: /home/merino
 
-dn: uid=student,ou=People,dc=csc,dc=wcupa,dc=edu
+dn: uid=dorper,ou=People,dc=csc,dc=wcupa,dc=edu
 objectClass: inetOrgPerson
 objectClass: posixAccount
 objectClass: shadowAccount
