@@ -1,89 +1,119 @@
-/*
- * MPI implementation of the trapezoid approach to integral calculation following a static
- * workload distribution and standard send()/recv() calls. 
- * We assume that the number of trapezoids is divisible by the number of MPI process. 
- */
-
 #include <stdio.h>
 #include <stdlib.h>
-#include "mpi.h"
+#include <mpi.h>
 
-double Trap(double a, double b, int n);
-double f(double x);
+#define SEND 1
+#define STOP 0
 
-int main(int argc, char * argv[] ) {
+float f(float x);
+
+main(int argc, char** argv) {
   int rank;     /* rank of each MPI process */
   int size;     /* total number of MPI processes */
   double a, b;  /* default left and right endpoints of the interval */
   int n;        /* total number of trapezoids */
   double h;        /* height of the trapezoids */
-  double local_a, local_b; /* left and right endpoints on each MPI process */
-  int local_n;  /* number of trapezoids assigned to each individual MPI process */
-  double result;       /* final integration result */
-  double local_result; /* partial integration result at each process */
-  double start, stop, tpar, tcomm;  /* timing variables */
-  int p;        /* counter */
-  MPI_Status status;
+  double param[3]; /* array containing end points and height for each individual trapezoid
+                      for communication purpose */
+  double local_result = 0.0;  /* area of each individual trapezoid */
+  double partial_result = 0.0; /* amount of area calculated by each process */
+  double result = 0.0;     /* Total integral            */
+  int source;    /* Process sending the partial integral  */
+  int dest = 0;  /* All messages go to 0      */
+  int tag = 0;
+  double start, stop, tpar, tcomm;
+  int i,count, partial_count;
+  MPI_Status  status;
 
-  MPI_Init(&argc,&argv);
-  MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-  MPI_Comm_size(MPI_COMM_WORLD,&size);
+  MPI_Init(&argc, &argv);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+    start = MPI_Wtime();
 
-  a = atof(argv[1]);
-  b = atof(argv[2]);
-  n = atoi(argv[3]);
-
-  // calculate work interval for each process
-  start = MPI_Wtime();
-  h = (b - a) / n;
-  local_n = n / size;
-  local_a = a + rank * local_n * h;
-  local_b = local_a + local_n * h;
-  local_result = Trap(local_a,local_b,local_n);
-  stop = MPI_Wtime();
-  tpar = stop - start;
-
-  printf("Process %d uses %lfs to calculate partial result %lf\n", rank, tpar, local_result);
-
-  // sending the results back to the master
-  start = MPI_Wtime();
+  /* initial job distribution is handled only by process 0 */
   if (rank == 0){
-    result = local_result;
-    for (p = 1; p < size; p++){
-      MPI_Recv(&local_result,1,MPI_DOUBLE,p,MPI_ANY_TAG,MPI_COMM_WORLD,&status);
-      result += local_result;
+    a = atof(argv[1]);               
+    b = atof(argv[2]);               
+    n = atoi(argv[3]);              
+    h = (b-a)/n;    
+    count = 0;
+    /* send out the first round of work assignment, incrementing count as needed */
+    for (i = 1; i < size; i++){
+      param[0] = a + count * h;
+      param[1] = param[0] + h;
+      param[2] = h;
+      MPI_Send(param,3,MPI_DOUBLE,i,SEND,MPI_COMM_WORLD);
+      count = count + 1;
     }
-  } 
-  else{
-    MPI_Send(&local_result,1,MPI_DOUBLE,0,0,MPI_COMM_WORLD);  
   }
-  stop  = MPI_Wtime();
-  tcomm = stop - start;
+  else {
+    MPI_Recv(param,3,MPI_DOUBLE,0,MPI_ANY_TAG,MPI_COMM_WORLD,&status);
+  }
+    
+  tpar = 0.0;
+  tcomm = 0.0;
+  partial_count = 0; 
+  /* Each process that is not process 0 works on its portion, send the partial result back to 0, 
+   * and wait for new workload unless the TAG of the message is 0 
+   */
+  if (rank != 0){
+    do {
+      start = MPI_Wtime();
+      local_result = param[2] * (f(param[1]) +  f(param[0])) / 2;
+      partial_result += local_result;
+      stop = MPI_Wtime(); 
+      tpar += stop - start;
+      partial_count += 1;
+      start = MPI_Wtime();
+      MPI_Send(&local_result,1,MPI_DOUBLE,0,SEND,MPI_COMM_WORLD);      
+      MPI_Recv(param,3,MPI_DOUBLE,0,MPI_ANY_TAG,MPI_COMM_WORLD,&status);
+      stop = MPI_Wtime();
+      tcomm += stop - start;
+    } while(status.MPI_TAG != 0);
+    printf("Process %d uses %lfs to calculate partial result %lf of %d portions and %lfs for communication \n", rank, tpar, partial_result, partial_count, tcomm);
+  }
+  
 
-  // displaying output at the master node
+  /* Process 0 receives results and sends out work while there is still work left to be sent
+   * (count < n) */
+  if (rank == 0) {
+    do {
+      MPI_Recv(&local_result,1,MPI_DOUBLE,MPI_ANY_SOURCE,MPI_ANY_TAG,MPI_COMM_WORLD,&status);
+      result = result + local_result;    
+      param[0] = a + count * h;
+      param[1] = param[0] + h;
+      param[2] = h;
+      MPI_Send(param,3,MPI_DOUBLE,status.MPI_SOURCE,SEND,MPI_COMM_WORLD); 
+      count = count + 1; 
+    }   
+    while (count < n);  
+
+    /* Make sure that we receive everything */
+    for (i = 0; i < (size - 1); i++){
+      MPI_Recv(&local_result,1,MPI_DOUBLE,MPI_ANY_SOURCE,MPI_ANY_TAG,MPI_COMM_WORLD,&status);
+      result = result + local_result;  
+    } 
+  }
+
+  /* All the work has been sent, */
   if (rank == 0){
-    printf("Calculating the integral of f(x) from %lf to %lf\n", a, b);
-    printf("The integral is %lf\n", result);  
-    printf("Communication time: %.5fs\n",tcomm);
+    for (i = 1; i < size; i++){
+      MPI_Send(param,3,MPI_DOUBLE,i,STOP,MPI_COMM_WORLD);
+    }
   }
-  MPI_Finalize();
-}
 
-double Trap(double a, double b, int n) {
-  double len, area;
-  double x;
-  int i;
-  len = (b - a) / n;
-  area = 0.5 * (f(a) + f(b));
-  x = a + len;
-  for (i=1; i<n; i++) {
-    area = area + f(x);
-    x = x + len;
-  }
-  area = area * len;
-  return area;
-}
+    /* Print the result */
+    if (rank == 0) {
+        printf("With n = %d trapezoids, our estimate\n",
+            n);
+        printf("of the integral from %f to %f = %f\n",
+            a, b, result);
+    }
 
-double f(double x) {
-  return ( x*x );
-}
+    /* Shut down MPI */
+    MPI_Finalize();
+} /*  main  */
+
+float f(float x) {
+    return ( x*x );
+} 
