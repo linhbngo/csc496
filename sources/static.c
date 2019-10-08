@@ -76,3 +76,4 @@ double Trap(double a, double b, int n) {
 
 double f(double x) {
   return ( x*x );
+}
