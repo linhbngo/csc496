@@ -4,13 +4,11 @@ import geni.rspec.igext as IG
 
 pc = portal.Context()
 request = pc.makeRequestRSpec()
-
 tourDescription = \
 """
 This profile provides the template for a Hortonworks cluster with one 
 namenode and three datanode.
 """
-
 tour = IG.Tour()
 tour.Description(IG.Tour.TEXT,tourDescription)
 request.addTour(tour)
