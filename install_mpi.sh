@@ -8,9 +8,8 @@ sudo ./configure --prefix=/opt/openmpi/3.1.2
 sudo make
 sudo make all install
 
-# change to your username instead lngo (my username)
-echo "export PATH=$PATH:/opt/openmpi/3.1.2/bin" >> /users/lngo/.bashrc
-echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/openmpi/3.1.2/lib/" >> /users/lngo/.bashrc
+echo "export PATH=$PATH:/opt/openmpi/3.1.2/bin" | sudo tee -a /etc/profile 
+echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/openmpi/3.1.2/lib/" | sudo tee -a /etc/profile 
 cd ..
 sudo rm -Rf openmpi-3.1.2
 sudo rm -Rf openmpi-3.1.2.tar.gz 
